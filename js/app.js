@@ -77,72 +77,94 @@
 
   /* ---------- מסגרת קבועה ---------- */
   const app = document.getElementById('app');
-  let topbar, keysEl, progEl, menuEl;
+  let topbar, dotsEl, titleEl, subEl, menuEl, sheetEl, barEl, hintBtn, sumBtn;
+  const barHandlers = { hint: null, sum: null };
 
   function buildChrome() {
-    keysEl = h('div', { class: 'keys' });
-    progEl = h('i');
+    titleEl = h('div', { class: 'tb-title' }, 'מסע בתוך הנפרון');
+    subEl = h('div', { class: 'tb-sub' });
+    dotsEl = h('div', { class: 'dots-nav' });
     topbar = h('header', { class: 'topbar' },
       h('div', { class: 'topbar-in' },
-        h('button', { class: 'brand', type: 'button', onclick: () => go(frontier()) }, 'מסע בתוך הנפרון'),
-        keysEl,
-        h('button', { class: 'menubtn', type: 'button', 'aria-label': 'תפריט', html: ICON.menu, onclick: openMenu })
-      ),
-      h('div', { class: 'progress' }, progEl)
-    );
-    menuEl = h('div', { class: 'menu', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'תפריט', onclick: (e) => { if (e.target === menuEl) closeMenu(); } });
+        h('button', { class: 'menubtn', type: 'button', 'aria-label': 'תפריט', html: ICON.menu, onclick: openMenu }),
+        h('div', { class: 'tb-text' }, titleEl, subEl),
+        dotsEl));
+    menuEl = h('div', { class: 'menu', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'תפריט',
+      onclick: (e) => { if (e.target === menuEl) closeMenu(); } });
+    sheetEl = h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true',
+      onclick: (e) => { if (e.target === sheetEl) closeSheet(); } });
+    hintBtn = h('button', { class: 'bb-hint', type: 'button', onclick: () => barHandlers.hint && barHandlers.hint() }, '💡 רמז');
+    sumBtn = h('button', { class: 'bb-sum', type: 'button', onclick: () => barHandlers.sum && barHandlers.sum() }, '📖 סיכום החדר');
+    barEl = h('div', { class: 'bottombar' }, h('div', { class: 'bottombar-in' }, hintBtn, sumBtn));
+    document.body.prepend(barEl);
+    document.body.prepend(sheetEl);
     document.body.prepend(menuEl);
     document.body.prepend(topbar);
   }
 
-  function updateChrome(currentRoom) {
-    keysEl.replaceChildren();
+  function updateChrome(currentRoom, title, sub) {
+    titleEl.textContent = title || 'מסע בתוך הנפרון';
+    subEl.textContent = sub || '';
+    subEl.style.display = sub ? '' : 'none';
+    dotsEl.replaceChildren();
     ROOMS.forEach((r) => {
       const got = !!S.keys[r.id];
       const ok = canEnter(r.id);
-      const b = h('button', {
-        class: 'keybtn' + (got ? ' got' : ''), type: 'button', html: ICON.key,
+      dotsEl.append(h('button', {
+        class: 'dotbtn' + (got ? ' got' : ''), type: 'button',
         'aria-label': 'חדר ' + r.id + (got ? ' (נפתח)' : ok ? '' : ' (נעול)'),
         'aria-current': currentRoom === r.id ? 'true' : null,
         disabled: !ok,
         onclick: () => go('#/room/' + r.id)
-      });
-      keysEl.append(b);
+      }, h('i')));
     });
-    progEl.style.width = Math.min(100, (keyCount() / N) * 100) + '%';
     let ban = document.getElementById('browse-banner');
     if (S.openAll) {
       if (!ban) {
-        ban = h('div', { id: 'browse-banner', class: 'browse-banner' }, h('span', null, 'מצב עיון פעיל: כל החדרים וההסברים פתוחים.'),
+        ban = h('div', { id: 'browse-banner', class: 'browse-banner' }, h('span', null, 'מצב עיון פעיל: כל החדרים פתוחים.'),
           h('button', { type: 'button', onclick: () => { S.openAll = false; save(); render(); } }, 'כיבוי'));
         topbar.append(ban);
       }
     } else if (ban) ban.remove();
   }
 
+  function setBar(on, hintFn, sumFn) {
+    barEl.classList.toggle('show', on);
+    document.body.classList.toggle('has-bar', on);
+    barHandlers.hint = hintFn; barHandlers.sum = sumFn;
+  }
+
+  function openSheet(title, node) {
+    sheetEl.replaceChildren(h('div', { class: 'sheet-panel' },
+      h('div', { class: 'sheet-head' }, h('h2', null, title),
+        h('button', { class: 'closebtn', type: 'button', 'aria-label': 'סגירה', onclick: closeSheet }, '×')),
+      node));
+    sheetEl.classList.add('open');
+  }
+  const closeSheet = () => sheetEl.classList.remove('open');
+
   function openMenu() {
     const list = h('ul', { class: 'menu-list' },
       h('li', null, h('button', { type: 'button', onclick: () => { closeMenu(); go('#/intro'); } },
-        h('span', { class: 'n' }, '◦'), 'פתיחה והסבר')),
+        h('span', { class: 'n' }, '◦'), 'מסך הפתיחה והסיפור')),
       ROOMS.map((r) => h('li', null, h('button', {
         type: 'button', disabled: !canEnter(r.id),
         onclick: () => { closeMenu(); go('#/room/' + r.id); }
       }, h('span', { class: 'n' }, S.keys[r.id] ? '✓' : String(r.id)), r.title))),
       h('li', null, h('button', { type: 'button', disabled: !canFinal(), onclick: () => { closeMenu(); go('#/final'); } },
-        h('span', { class: 'n' }, '★'), 'סיכום ושאלות בחינה')));
+        h('span', { class: 'n' }, '★'), 'יציאה, סיכום ושאלות בחינה')));
     const modeBtn = h('button', { class: 'btn-quiet', type: 'button', 'aria-pressed': S.openAll ? 'true' : 'false', onclick: () => {
-      S.openAll = !S.openAll; save();
-      closeMenu(); render();
+      S.openAll = !S.openAll; save(); closeMenu(); render();
     } }, S.openAll ? 'מצב עיון: פעיל (לחצו לכיבוי)' : 'מצב עיון: כבוי (לחצו להפעלה)');
     const panel = h('div', { class: 'menu-panel' },
       h('div', { style: 'display:flex;justify-content:space-between;align-items:center' },
-        h('h2', null, 'חדרי הנפרון'),
-        h('button', { class: 'menubtn', type: 'button', 'aria-label': 'סגירת התפריט', style: 'color:var(--ink);font-size:1.6rem', onclick: closeMenu }, '×')),
+        h('h2', null, 'מפת המסע'),
+        h('button', { class: 'closebtn', type: 'button', 'aria-label': 'סגירת התפריט', onclick: closeMenu }, '×')),
       list,
       h('p', { class: 'menu-note' }, 'ההתקדמות נשמרת בדפדפן הזה בלבד.'),
       h('div', { class: 'menu-actions' },
         modeBtn,
-        h('p', { class: 'menu-note', style: 'margin:0' }, 'מצב עיון פותח את כל החדרים גם בלי לפתור את החידות, כדי לעבור על התוכן. הוא משנה רק חדרים שעוד לא נפתרו.'),
+        h('p', { class: 'menu-note', style: 'margin:0' }, 'מצב עיון פותח את כל החדרים גם בלי לפתור את החידות, כדי לעבור על התוכן.'),
         h('button', { class: 'btn-quiet', type: 'button', onclick: () => {
           if (confirm('למחוק את כל ההתקדמות ולהתחיל מחדש?')) { S = fresh(); save(); closeMenu(); go('#/intro'); }
         } }, 'איפוס התקדמות (מחיקת כל מה שנפתר)')));
@@ -156,16 +178,7 @@
     return h('div', { class: 'fb ' + kind, role: 'status', html: '<b>' + title + '</b>' + html });
   }
 
-  function hintBlock(text) {
-    if (!text) return null;
-    const box = h('div');
-    const btn = h('button', { class: 'hintbtn', type: 'button' }, 'צריכים רמז?');
-    btn.onclick = () => {
-      if (box.firstChild) { box.replaceChildren(); btn.textContent = 'צריכים רמז?'; }
-      else { box.append(h('div', { class: 'hint', html: '<b>רמז:</b> ' + text })); btn.textContent = 'הסתרת הרמז'; }
-    };
-    return h('div', null, btn, box);
-  }
+  function hintBlock() { return document.createDocumentFragment(); } // הרמז זמין בסרגל התחתון
 
   /* מסיים חידה: מציג את ה"אחרי" וכפתור המשך */
   function finish(p, container, done) {
@@ -204,6 +217,164 @@
 
   /* ---------- סוגי חידות ---------- */
   const PUZZLES = {};
+
+  /* ---------- אנימציות על canvas ---------- */
+  function palette() {
+    const s = getComputedStyle(document.documentElement);
+    const g = (n) => s.getPropertyValue(n).trim();
+    return { blood: g('--blood'), bloodSoft: g('--blood-soft'), filtrate: g('--filtrate'), filtrateSoft: g('--filtrate-soft'),
+      urine: g('--urine'), urineSoft: g('--urine-soft'), ink: g('--ink'), line: g('--line'), paper: g('--paper-2'),
+      ok: g('--ok'), card: g('--card'), muted: g('--muted'), concHi: g('--conc-hi') };
+  }
+  /* לולאת אנימציה; step(dt, ctx, col) מצייר. נעצרת כשה-canvas יוצא מהדף */
+  function runCanvas(canvas, W, H, step) {
+    const ctx = canvas.getContext('2d');
+    let last = performance.now(), miss = 0;
+    function frame(now) {
+      if (!canvas.isConnected) { if (++miss > 40) return; requestAnimationFrame(frame); return; }
+      miss = 0;
+      const r = canvas.getBoundingClientRect();
+      const d = window.devicePixelRatio || 1;
+      const cw = Math.max(1, Math.round(r.width * d));
+      if (canvas.width !== cw) { canvas.width = cw; canvas.height = Math.round(cw * H / W); }
+      ctx.setTransform(canvas.width / W, 0, 0, canvas.width / W, 0, 0);
+      const dt = Math.min(0.05, (now - last) / 1000); last = now;
+      ctx.clearRect(0, 0, W, H);
+      step(dt, ctx, palette());
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
+  const newCanvas = (W, H, label) => h('canvas', { role: 'img', 'aria-label': label,
+    style: 'width:100%;aspect-ratio:' + W + '/' + H + ';display:block;border-radius:12px;border:1px solid var(--line);background:var(--paper-2)' });
+  function rrect(ctx, x, y, w, hh, rad) {
+    ctx.beginPath();
+    ctx.moveTo(x + rad, y); ctx.arcTo(x + w, y, x + w, y + hh, rad); ctx.arcTo(x + w, y + hh, x, y + hh, rad);
+    ctx.arcTo(x, y + hh, x, y, rad); ctx.arcTo(x, y, x + w, y, rad); ctx.closePath();
+  }
+  function hexagon(ctx, x, y, rad) {
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) { const t = Math.PI / 3 * i + Math.PI / 6; ctx.lineTo(x + rad * Math.cos(t), y + rad * Math.sin(t)); }
+    ctx.closePath();
+  }
+
+  /* מחוון עם כפתורי + ו- (נוח במגע). הערך הגבוה בצד ימין */
+  function stepSlider(label, min, max, val, onChange) {
+    const input = h('input', { type: 'range', min: String(min), max: String(max), value: String(val), 'aria-label': label });
+    const set = (v) => { v = Math.max(min, Math.min(max, v)); input.value = v; onChange(+v); };
+    input.addEventListener('input', () => onChange(+input.value));
+    const dec = h('button', { class: 'stepbtn', type: 'button', 'aria-label': label + ': צמצום', onclick: () => set(+input.value - 10) }, '−');
+    const inc = h('button', { class: 'stepbtn', type: 'button', 'aria-label': label + ': הרחבה', onclick: () => set(+input.value + 10) }, '+');
+    const el = h('div', { class: 'stepper' },
+      h('div', { class: 'slider-label' }, h('span', null, label + ' (+ הרחבה, − צמצום)')),
+      h('div', { class: 'stepper-row' }, inc, input, dec));
+    return { el, input, set };
+  }
+
+  /* סימולציית שני הברזים: ניבוי ואז בדיקה */
+  PUZZLES['valves-sim'] = (p, done) => {
+    const root = h('div');
+    const W = 320, H = 230;
+    const st = { A: 60, E: 60 };
+    const calc = () => {
+      const q = st.A / st.E;
+      const P = q / (q + 1);
+      const gfr = Math.max(0, (P - 0.3) / 0.53);
+      return { P, gfr: Math.min(1, gfr) };
+    };
+    const canvas = newCanvas(W, H, 'אנימציה של פקעית: דם נכנס בעורקיק מביא, יוצא בעורקיק מוציא, ותסנין יורד אל קופסית באומן');
+    const rbcs = [], drops = [];
+    let tRbc = 0, tDrop = 0;
+    runCanvas(canvas, W, H, (dt, ctx, c) => {
+      const { gfr } = calc();
+      const tA = 6 + st.A * 0.26, tE = 6 + st.E * 0.26;
+      const cy = 78, cx = 160;
+      ctx.fillStyle = c.bloodSoft; ctx.strokeStyle = c.blood; ctx.lineWidth = 1.5;
+      rrect(ctx, -6, cy - tA / 2, 134, tA, 4); ctx.fill(); ctx.stroke();
+      rrect(ctx, 192, cy - tE / 2, 134, tE, 4); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = c.filtrateSoft; ctx.strokeStyle = c.filtrate;
+      ctx.beginPath(); ctx.arc(cx, cy, 54, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      rrect(ctx, cx - 9, cy + 52, 18, 100, 4); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = c.bloodSoft; ctx.strokeStyle = c.blood; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(cx, cy, 36, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx - 24, cy - 8);
+      ctx.bezierCurveTo(cx - 10, cy - 30, cx + 10, cy + 10, cx + 24, cy - 14);
+      ctx.moveTo(cx - 22, cy + 14); ctx.bezierCurveTo(cx - 6, cy - 4, cx + 8, cy + 30, cx + 24, cy + 10); ctx.stroke();
+      ctx.fillStyle = c.ink; ctx.font = '12px Heebo, sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('עורקיק מביא', 52, 22);
+      ctx.fillText('עורקיק מוציא', 268, 22);
+      ctx.fillStyle = c.filtrate; ctx.fillText('תסנין אל הצינורית', cx, 222);
+      tRbc -= dt;
+      if (tRbc <= 0) { rbcs.push({ x: -6, y: (Math.random() - .5) }); tRbc = 0.9 / (0.25 + st.A / 60); }
+      const sA = 40 + st.A * 0.9, sE = 24 + st.E * 0.9;
+      for (let i = rbcs.length - 1; i >= 0; i--) {
+        const q = rbcs[i];
+        q.x += dt * (q.x < 124 ? sA : q.x < 196 ? (sA + sE) / 2 : sE);
+        if (q.x > 330) { rbcs.splice(i, 1); continue; }
+        const tt = q.x < 124 ? tA : q.x > 196 ? tE : 20;
+        const yy = cy + q.y * Math.max(1, tt / 2 - 4);
+        ctx.fillStyle = c.blood; ctx.beginPath(); ctx.ellipse(q.x, yy, 4.5, 3.4, 0, 0, Math.PI * 2); ctx.fill();
+      }
+      tDrop -= dt;
+      if (gfr > 0.02 && tDrop <= 0) { drops.push({ x: cx + (Math.random() - .5) * 40, y: cy + 10, ph: 0 }); tDrop = 0.7 / (0.4 + gfr * 7); }
+      for (let i = drops.length - 1; i >= 0; i--) {
+        const q = drops[i];
+        if (q.ph === 0) { q.y += dt * 38; q.x += (cx - q.x) * dt * 1.5; if (q.y > cy + 54) q.ph = 1; }
+        else { q.x += (cx - q.x) * dt * 6; q.y += dt * 55; }
+        if (q.y > 208) { drops.splice(i, 1); continue; }
+        ctx.fillStyle = c.filtrate; ctx.beginPath(); ctx.arc(q.x, q.y, 3.2, 0, Math.PI * 2); ctx.fill();
+      }
+    });
+
+    const mP = { bar: h('div', { class: 'bar blood' }, h('i')), val: h('span') };
+    const mG = { bar: h('div', { class: 'bar' }, h('i')), val: h('span') };
+    const meter = (l, m) => h('div', { class: 'meter' }, h('div', { class: 'lbl' }, h('span', null, l), m.val), m.bar);
+    function upd() {
+      const { P, gfr } = calc();
+      mP.bar.firstChild.style.width = Math.round(P * 100) + '%';
+      mG.bar.firstChild.style.width = Math.round(gfr * 100) + '%';
+      mP.val.textContent = P > 0.62 ? 'גבוה' : P > 0.4 ? 'בינוני' : 'נמוך';
+      mG.val.textContent = gfr > 0.6 ? 'גבוה' : gfr > 0.2 ? 'בינוני' : 'נמוך מאוד';
+    }
+    const sAf = stepSlider('עורקיק מביא', 20, 100, st.A, (v) => { st.A = v; upd(); });
+    const sEf = stepSlider('עורקיק מוציא', 20, 100, st.E, (v) => { st.E = v; upd(); });
+    const task = h('div', { class: 'scenario' });
+    const msg = h('div');
+    const check = h('button', { class: 'btn', type: 'button' }, 'בדיקה');
+    let ti = 0;
+    const tasks = [
+      { t: 'משימה 1: הגדילו את קצב הסינון בעזרת העורקיק המוציא בלבד. העורקיק המביא נשאר כמו שהוא.',
+        ok: () => Math.abs(st.A - 60) <= 10 && calc().gfr > 0.6,
+        yes: 'צמצום המוציא מעלה את הלחץ בפקעית ואיתו את קצב הסינון.',
+        no: 'שימו לב שהעורקיק המביא לא זז, ושקצב הסינון צריך להיות גבוה.' },
+      { t: 'משימה 2: הורידו את קצב הסינון כמעט לאפס בעזרת העורקיק המביא בלבד. המוציא נשאר כמו שהוא.',
+        ok: () => Math.abs(st.E - 60) <= 10 && calc().gfr < 0.12,
+        yes: 'צמצום המביא מקטין את כמות הדם הנכנסת, והלחץ בפקעית יורד.',
+        no: 'הזיזו רק את המביא, ובדקו שקצב הסינון נעשה נמוך מאוד.' }
+    ];
+    function showTask() { task.textContent = tasks[ti].t; st.A = 60; st.E = 60; sAf.set(60); sEf.set(60); }
+    check.onclick = () => {
+      const t = tasks[ti];
+      if (t.ok()) {
+        msg.replaceChildren(fbBox('ok', 'נכון. ', t.yes));
+        ti++;
+        if (ti >= tasks.length) { check.remove(); task.remove(); finish(p, root, done); }
+        else { check.disabled = true; setTimeout(() => { check.disabled = false; msg.replaceChildren(); showTask(); }, 1800); }
+      } else msg.replaceChildren(fbBox('no', 'לא מתאים. ', t.no));
+    };
+
+    const simBox = h('div', { class: 'sim', style: 'display:none' },
+      h('p', { style: 'margin:0 0 10px', html: 'הקישו על <b>+</b> ו-<b>−</b> (או גררו) כדי להרחיב ולצמצם כל עורקיק, וראו מה קורה לטיפות התסנין.' }),
+      canvas, sAf.el, sEf.el, meter('לחץ הידרוסטטי בפקעית', mP), meter('קצב הסינון', mG));
+    const after = h('div', { style: 'display:none' }, task, msg, h('div', { class: 'row-actions' }, check));
+    const predict = h('div', null,
+      h('p', { style: 'font-weight:600' }, 'שלב 1: נבאו.'),
+      choiceBlock(p.opts, () => { simBox.style.display = ''; after.style.display = ''; showTask(); upd(); }),
+      hintBlock(p.hint));
+    root.append(predict, h('p', { style: 'font-weight:600;margin-top:18px' }, 'שלב 2: בדקו במודל.'), simBox, after);
+    return root;
+  };
+
 
   PUZZLES.choice = (p, done) => {
     const root = h('div');
@@ -317,6 +488,56 @@
       const val = h('span');
       return { wrap: h('div', { class: 'meter' }, h('div', { class: 'lbl' }, h('span', null, label), val), bar), bar, val };
     }
+
+    const GW = 320, GH = 200;
+    const gcanvas = newCanvas(GW, GH, 'אנימציה: מולקולות גלוקוז בצינורית. נשאים תפוסים אינם יכולים לספוג עוד, והעודף ממשיך אל השתן');
+    const slots = Array.from({ length: 6 }, (_, i) => ({ x: 96 + i * 24, busy: 0 }));
+    const gp = []; let gSpawn = 0, nReab = 0, nUrine = 0, gClock = 0;
+    runCanvas(gcanvas, GW, GH, (dt, ctx, c) => {
+      const v = +slider.value;
+      gClock += dt;
+      ctx.fillStyle = c.filtrateSoft; ctx.fillRect(0, 18, GW, 60);
+      ctx.fillStyle = c.urineSoft; ctx.fillRect(0, 78, GW, 36);
+      ctx.fillStyle = c.bloodSoft; ctx.fillRect(0, 114, GW, 70);
+      ctx.fillStyle = c.muted; ctx.font = '11px Heebo, sans-serif'; ctx.textAlign = 'right';
+      ctx.fillText('חלל הצינורית (תסנין)', GW - 8, 14);
+      ctx.fillText('תא הצינורית', GW - 8, 100);
+      ctx.fillText('דם', GW - 8, 130);
+      ctx.textAlign = 'left'; ctx.fillText('← אל השתן', 6, 52);
+      slots.forEach((s) => {
+        s.busy = Math.max(0, s.busy - dt);
+        ctx.fillStyle = s.busy > 0 ? c.filtrate : c.card; ctx.strokeStyle = c.filtrate; ctx.lineWidth = 1.5;
+        rrect(ctx, s.x - 8, 74, 16, 14, 4); ctx.fill(); ctx.stroke();
+      });
+      gSpawn -= dt;
+      const rate = v / 100 * 9;
+      if (rate > 0.05 && gSpawn <= 0) { gp.push({ x: GW + 6, y: 36 + Math.random() * 30, st: 'flow', t: 0, ph: Math.random() * 6 }); gSpawn = 1 / rate; }
+      for (let i = gp.length - 1; i >= 0; i--) {
+        const q = gp[i];
+        if (q.st === 'flow') {
+          q.x -= dt * 48; q.y += Math.sin(gClock * 2 + q.ph) * dt * 6;
+          if (q.x < 250 && !q.decided) {
+            q.decided = true;
+            const free = slots.filter((s) => s.busy <= 0 && s.x <= q.x).sort((p1, p2) => p2.x - p1.x)[0];
+            if (free) { free.busy = 1.3; q.st = 'bind'; q.slot = free; }
+          }
+          if (q.x < -8) { nUrine++; gp.splice(i, 1); continue; }
+        } else {
+          q.t += dt;
+          q.x += (q.slot.x - q.x) * Math.min(1, dt * 5);
+          q.y += ((q.t < 0.5 ? 81 : 150) - q.y) * Math.min(1, dt * 4);
+          if (q.t > 1.1) { nReab++; gp.splice(i, 1); continue; }
+        }
+        ctx.fillStyle = c.ok; hexagon(ctx, q.x, q.y, 5.5); ctx.fill();
+      }
+    });
+    const cReab = h('span'), cUr = h('span');
+    const counters = h('div', { class: 'sim-status', style: 'display:flex;gap:14px;justify-content:space-between;font-size:.95rem' }, cReab, cUr);
+    const cTimer = setInterval(() => {
+      if (!counters.isConnected) { clearInterval(cTimer); return; }
+      cReab.textContent = 'נספגו אל הדם: ' + nReab; cUr.textContent = 'יצאו בשתן: ' + nUrine;
+    }, 250);
+
     const mFilt = meter('מסונן אל התסנין', 'blood');
     const mReab = meter('נספג חזרה אל הדם', '');
     const mUr = meter('יוצא בשתן', 'urine');
@@ -353,7 +574,8 @@
     out.append(
       h('div', { class: 'sim' },
         h('div', { class: 'slider-label' }, h('span', null, 'גלוקוז בדם: גבוה'), h('span', null, 'נמוך')),
-        slider, mFilt.wrap, mReab.wrap, mUr.wrap,
+        h('p', { style: 'margin:0 0 10px', html: 'כל מולקולת גלוקוז (משושה ירוק) מחכה לנשא פנוי. ששת הנשאים תופסים מולקולה אחת בכל פעם. הגדילו את הגלוקוז בדם וראו מה קורה.' }),
+        gcanvas, counters, slider, mFilt.wrap, mReab.wrap, mUr.wrap,
         h('div', { class: 'meter' }, h('div', { class: 'lbl' }, h('span', null, 'נשאים תפוסים'))), dots, status)
     );
     root.append(out, q);
@@ -387,6 +609,52 @@
     }
     slider.addEventListener('input', upd);
 
+
+    const AW = 320, AH = 210;
+    const acanvas = newCanvas(AW, AH, 'אנימציה של הצינור המאסף: ככל ש-ADH גבוה יותר נפתחות יותר תעלות מים ויותר מים עוברים אל הליבה');
+    const aDrops = []; let aSpawn = 0, aClock = 0;
+    const CH = 8, chX = (i) => 44 + i * 33;
+    runCanvas(acanvas, AW, AH, (dt, ctx, c) => {
+      const open = Math.round(+slider.value / 100 * CH);
+      aClock += dt;
+      ctx.fillStyle = c.filtrateSoft; ctx.fillRect(0, 18, AW, 62);
+      ctx.fillStyle = c.urineSoft; ctx.fillRect(0, 96, AW, 100);
+      ctx.fillStyle = c.muted; ctx.font = '11px Heebo, sans-serif'; ctx.textAlign = 'right';
+      ctx.fillText('חלל הצינור המאסף', AW - 8, 14);
+      ctx.fillText('ליבת הכליה: רקמה מרוכזת, ומשם המים חוזרים אל הדם', AW - 8, 208);
+      // דופן
+      ctx.fillStyle = c.ink; ctx.globalAlpha = 0.55; ctx.fillRect(0, 80, AW, 16); ctx.globalAlpha = 1;
+      for (let i = 0; i < CH; i++) {
+        const x = chX(i), isOpen = i < open;
+        ctx.fillStyle = isOpen ? c.filtrate : c.card;
+        ctx.strokeStyle = c.filtrate; ctx.lineWidth = 1.5;
+        rrect(ctx, x - 9, 78, 18, 20, 5); ctx.fill(); ctx.stroke();
+        if (!isOpen) { ctx.strokeStyle = c.muted; ctx.beginPath(); ctx.moveTo(x - 5, 88); ctx.lineTo(x + 5, 88); ctx.stroke(); }
+      }
+      aSpawn -= dt;
+      if (aSpawn <= 0) { aDrops.push({ x: AW + 4, y: 30 + Math.random() * 40, tgt: Math.floor(Math.random() * CH), st: 'flow' }); aSpawn = 0.16; }
+      for (let i = aDrops.length - 1; i >= 0; i--) {
+        const q = aDrops[i];
+        if (q.st === 'flow') {
+          q.x -= dt * 60;
+          const tx = chX(q.tgt);
+          if (q.x <= tx + 2 && !q.d) {
+            q.d = true;
+            if (q.tgt < open) q.st = 'pass';
+          }
+          if (q.x < -6) { aDrops.splice(i, 1); continue; }
+          ctx.fillStyle = c.filtrate; ctx.beginPath(); ctx.arc(q.x, q.y, 3.3, 0, Math.PI * 2); ctx.fill();
+        } else {
+          q.x += (chX(q.tgt) - q.x) * Math.min(1, dt * 8);
+          q.y += dt * 75;
+          if (q.y > 176) { aDrops.splice(i, 1); continue; }
+          ctx.globalAlpha = q.y > 150 ? Math.max(0, (176 - q.y) / 26) : 1;
+          ctx.fillStyle = c.filtrate; ctx.beginPath(); ctx.arc(q.x, q.y, 3.3, 0, Math.PI * 2); ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+      }
+    });
+
     const scen = h('div', { class: 'scenario' });
     const msg = h('div');
     const ok = h('button', { class: 'btn', type: 'button' }, 'אישור');
@@ -416,7 +684,9 @@
       h('div', { class: 'sim' },
         h('div', { class: 'slider-label' }, h('span', null, 'ADH גבוה'), h('span', null, 'ADH נמוך')),
         slider,
-        h('div', { class: 'meter' }, h('div', { class: 'lbl' }, h('span', null, 'תעלות מים פתוחות בצינור המאסף'))), gates,
+        h('p', { style: 'margin:0 0 10px', html: 'טיפות המים (כחול) זורמות בצינור. רק בתעלה פתוחה הן יכולות לעבור אל הליבה. ככל ש-ADH גבוה יותר, נפתחות יותר תעלות (אקוואפורין-2).' }),
+        acanvas,
+        h('div', { class: 'meter' }, h('div', { class: 'lbl' }, h('span', null, 'תעלות מים פתוחות'))), gates,
         wrapMeter('חדירות הצינור למים', mPerm),
         wrapMeter('נפח השתן', mVol),
         wrapMeter('ריכוז השתן', mCon)),
@@ -542,30 +812,39 @@
 
   function viewIntro() {
     const root = h('div');
-    root.append(h('section', { class: 'hero' }, h('div', { class: 'wrap' },
+    const startBtn = h('button', { class: 'btn', type: 'button', onclick: () => {
+      S.started = true; save(); go(frontier());
+    } }, S.started ? 'המשיכו מהמקום שעצרתם' : 'יוצאים לדרך');
+    const actions = h('div', { class: 'hero-actions' }, startBtn,
+      h('button', { class: 'btn light', type: 'button', onclick: openMenu }, 'מפת המסע'));
+    if (S.started) {
+      actions.append(h('button', { class: 'btn light', type: 'button', onclick: () => {
+        if (confirm('להתחיל את כל המסע מחדש?')) { S = fresh(); save(); render(); }
+      } }, 'התחלה מחדש'));
+    }
+    root.append(h('section', { class: 'hero', style: '--bgy:20%' }, h('div', { class: 'wrap' },
       h('div', { class: 'kicker' }, 'חדר בריחה במדעי הבריאות · כיתה י״א'),
       h('h1', null, 'מסע בתוך הנפרון'),
-      h('p', { class: 'sub' }, 'חמישה חדרים. אזור אחד בנפרון בכל חדר. דרך אחת החוצה.'))));
+      h('div', { class: 'story', html:
+        '<p>מדען יצר צוללת זעירה, בגודל של תא, והכניס אתכם אליה. הצוללת נשאה אתכם אל תוך זרם הדם.</p>' +
+        '<p>הדרך היחידה לצאת מן הגוף היא דרך מערכת השתן. כדי לצאת, עליכם לעבור את כל תחנות הנפרון, להבין איך נוצר השתן, ולפתוח חמש דלתות.</p>' +
+        '<p>נפרי, הרובוט שלצדכם, ילווה אתכם.</p>' }),
+      actions)));
 
-    const wrap = h('div', { class: 'wrap' });
-    wrap.append(h('p', { class: 'scene', html: 'הכליות מסננות בכל יממה כ-180 ליטר נוזל, ומוציאות מן הגוף כ-1.5 ליטר שתן בלבד. בין שני המספרים האלה מתרחש כל הסיפור.' }));
-    wrap.append(h('p', { html: 'אתם נכנסים לכליה עם זרם הדם, דרך עורק הכליה, ועליכם לעבור את כל הנפרון: מן הפקעית ועד היציאה לדרכי השתן. כל חדר הוא אזור אחד בנפרון, והוא נעול עד שתפתרו את החידות שבו. בסוף כל חדר תקבלו הסבר מסודר על האזור שבו הייתם.' }));
-    wrap.append(h('h2', { style: 'font-size:1.3rem;margin:26px 0 6px' }, 'המפה שתלווה אתכם לאורך כל הדרך'));
-    wrap.append(h('p', { html: 'בכל חדר תחזרו לשני זרמים: <b style="color:var(--blood)">דם</b> ו<b style="color:var(--filtrate)">נוזל הצינורית</b>, ולשלושה מעברים ביניהם. מי שמבין לאן חומר נע, ובאיזה תהליך, מבין את הנפרון.' }));
+    const wrap = h('div', { class: 'wrap', style: 'padding-top:26px' });
+    wrap.append(h('div', { class: 'scene', html: 'הכליות מסננות בכל יממה כ-180 ליטר נוזל, ומוציאות מן הגוף כ-1.5 ליטר שתן בלבד. בין שני המספרים האלה מתרחש כל הסיפור.' }));
+    wrap.append(h('h2', { style: 'font-size:1.4rem;margin:26px 0 6px' }, 'המפה שתלווה אתכם בכל חדר'));
+    wrap.append(h('p', { html: 'שני זרמים, <b style="color:var(--blood)">דם</b> ו<b style="color:var(--filtrate)">נוזל הצינורית</b>, ושלושה מעברים ביניהם. מי שמבין לאן חומר נע ובאיזה תהליך, מבין את הנפרון.' }));
     wrap.append(h('div', { class: 'card figure', html: twoRiversSvg() }));
     wrap.append(h('ul', { html:
       '<li><b>סינון:</b> מן הדם אל הצינורית, בפקעית.</li>' +
       '<li><b>ספיגה חוזרת:</b> מן הצינורית חזרה אל הדם.</li>' +
       '<li><b>הפרשה:</b> מן הדם אל הצינורית, אחרי הפקעית.</li>' }));
 
-    wrap.append(h('h2', { style: 'font-size:1.3rem;margin:26px 0 6px' }, 'לפני שנכנסים: שלוש שאלות, בלי ציון'));
-    wrap.append(h('p', { style: 'color:var(--muted)' }, 'ענו לפי מה שאתם חושבים עכשיו. בסוף המסע נחזור אליהן.'));
-
-    const enter = h('button', { class: 'btn gold', type: 'button', disabled: true }, 'כניסה לחדר הראשון');
-    const refresh = () => { enter.disabled = !PRE.every((q) => S.pre[q.id] != null); };
-
+    wrap.append(h('h2', { style: 'font-size:1.4rem;margin:30px 0 6px' }, 'לפני שיוצאים לדרך (רשות)'));
+    wrap.append(h('p', { style: 'color:var(--muted)' }, 'שלוש שאלות קצרות, בלי ציון, כדי לבדוק מה אתם חושבים עכשיו. בסוף המסע נשווה לתשובות שלכם.'));
     PRE.forEach((q, qi) => {
-      const card = h('div', { class: 'card' }, h('div', { class: 'puzzle-tag' }, 'שאלה ' + (qi + 1)), h('p', { style: 'font-weight:600' }, q.q));
+      const card = h('div', { class: 'card' }, h('div', { class: 'puzzle-tag' }, 'שאלה ' + (qi + 1)), h('p', { style: 'font-weight:700' }, q.q));
       const list = h('div', { class: 'opts' });
       q.opts.forEach((t, i) => {
         const b = h('button', { class: 'opt' + (S.pre[q.id] === i ? ' picked' : ''), type: 'button' },
@@ -573,66 +852,73 @@
         b.onclick = () => {
           S.pre[q.id] = i; save();
           [...list.children].forEach((x, k) => x.classList.toggle('picked', k === i));
-          refresh();
         };
         list.append(b);
       });
       card.append(list);
       wrap.append(card);
     });
-
-    enter.onclick = () => { S.started = true; save(); go('#/room/1'); };
-    refresh();
-    wrap.append(h('div', { class: 'row-actions' }, enter));
-    if (S.started) {
-      wrap.append(h('p', { style: 'margin-top:14px' }, h('a', { href: frontier() }, 'להמשיך מהמקום שבו הפסקתם')));
-    }
+    wrap.append(h('div', { class: 'row-actions' }, h('button', { class: 'btn', type: 'button', onclick: () => { S.started = true; save(); go(frontier()); } }, S.started ? 'המשיכו אל החדר' : 'יוצאים לדרך')));
     wrap.append(h('p', { class: 'foot' }, 'מבוסס על ספר המגמה נפרולוגיה, ערך וארגן אורי העליון.'));
     root.append(wrap);
     return root;
   }
 
+  const TYPE_WORD = { choice: 'בחרו', order: 'סדרו', classify: 'מיינו', 'glucose-sim': 'בדקו', 'adh-sim': 'בדקו', 'valves-sim': 'נבאו ובדקו', loop: 'עקבו' };
+
   function viewRoom(n) {
     const room = ROOMS[n - 1];
     const root = h('div');
-    root.append(h('section', { class: 'hero' }, h('div', { class: 'wrap' },
-      h('div', { class: 'hero-row' },
-        h('div', { class: 'hero-icon', html: ICON[room.icon] }),
-        h('div', null,
-          h('div', { class: 'kicker' }, 'חדר ' + n + ' מתוך ' + N),
-          h('h1', null, room.title),
-          h('p', { class: 'sub' }, room.place))))));
-
     const wrap = h('div', { class: 'wrap' });
-    wrap.append(h('p', { class: 'scene' }, room.scene));
+    const segs = h('div', { class: 'segs' });
+    wrap.append(segs);
+    wrap.append(h('div', { class: 'scene' }, room.scene));
     wrap.append(h('p', { class: 'objective', html: room.objective }));
-    const body = h('div');
-    if (n > 1 || S.keys[n]) {
-      const top = h('div', { class: 'row-actions', style: 'margin:0 0 18px' });
-      if (n > 1) top.append(h('button', { class: 'btn ghost', type: 'button', onclick: () => go('#/room/' + (n - 1)) }, '→ חדר ' + (n - 1) + ': ' + ROOMS[n - 2].title));
-      if (S.keys[n]) top.append(h('button', { class: 'btn ghost', type: 'button', onclick: () => { const e = document.querySelector('.explain'); if (e) e.scrollIntoView({ behavior: 'smooth', block: 'start' }); } }, 'קפיצה להסבר החדר'));
-      wrap.append(top);
+    if (n > 1) {
+      wrap.append(h('div', { class: 'row-actions', style: 'margin:0 0 16px' },
+        h('button', { class: 'btn ghost', type: 'button', style: 'min-height:48px;padding:10px 16px;font-size:1rem',
+          onclick: () => go('#/room/' + (n - 1)) }, '→ חדר ' + (n - 1) + ': ' + ROOMS[n - 2].title)));
     }
+    const body = h('div');
     wrap.append(body);
     root.append(wrap);
 
     let justUnlocked = false;
+    let activeP = null, solvedAll = false;
+
+    function explainNode() {
+      const d = h('div', { class: 'explain' });
+      d.insertAdjacentHTML('beforeend', room.explain);
+      return d;
+    }
+    setBar(true,
+      () => {
+        if (solvedAll) { openSheet('רמז', h('p', null, 'החדר נפתר. אפשר לחזור לחידות שנפתרו מהרשימה.')); return; }
+        openSheet('רמז', h('div', { class: 'hint', style: 'margin:0' }, activeP && activeP.hint ? activeP.hint : 'לחידה הזו אין רמז מיוחד. נסו לקרוא את הסיכום של החדר.'));
+      },
+      () => openSheet('סיכום החדר: ' + room.title, explainNode()));
 
     function refreshRoom(scrollToNext) {
       body.replaceChildren();
       const solved = S.solved[n] || (S.solved[n] = {});
       let activeEl = null;
       let allDone = true;
+      activeP = null;
+      segs.replaceChildren();
 
       room.puzzles.forEach((p, i) => {
-        const tag = 'חידה ' + (i + 1) + ' מתוך ' + room.puzzles.length;
+        const tag = (TYPE_WORD[p.type] || 'חידה') + ' · ' + (i + 1) + '/' + room.puzzles.length;
+        let cls = '';
         if (solved[p.id]) {
+          cls = 'done';
           body.append(h('details', { class: 'solved-puzzle' },
             h('summary', null, h('span', { class: 'tick' }, '✓'), p.title),
             h('div', { class: 'body', html: p.after || '' })));
         } else if (allDone) {
           allDone = false;
-          const card = h('section', { class: 'card puzzle', style: 'scroll-margin-top:70px' },
+          cls = 'cur';
+          activeP = p;
+          const card = h('section', { class: 'card puzzle', style: 'scroll-margin-top:80px' },
             h('div', { class: 'puzzle-tag' }, tag),
             h('h3', null, p.title),
             h('p', { class: 'prompt' }, p.prompt));
@@ -640,71 +926,106 @@
             solved[p.id] = true;
             const last = room.puzzles.every((q) => solved[q.id]);
             if (last && !S.keys[n]) { S.keys[n] = true; justUnlocked = true; }
-            save(); updateChrome(n); refreshRoom(true);
+            save(); updateChrome(n, 'חדר ' + n + ' · ' + room.title, room.place); refreshRoom(true);
           }));
           body.append(card);
           activeEl = card;
         } else {
-          body.append(h('div', { class: 'puzzle-tag', style: 'opacity:.6;margin:6px 4px' }, '🔒 ' + tag + ' · ' + p.title));
+          body.append(h('div', { class: 'puzzle-tag', style: 'opacity:.7;margin:6px 4px' }, '🔒 ' + tag + ' · ' + p.title));
         }
+        segs.append(h('i', { class: cls }));
       });
+      solvedAll = allDone;
+      hintBtn.disabled = allDone;
 
       if (allDone) {
-        const un = h('section', { class: 'unlock' + (justUnlocked ? ' pop' : ''), style: 'scroll-margin-top:70px' },
+        const un = h('section', { class: 'unlock' + (justUnlocked ? ' pop' : ''), style: 'scroll-margin-top:80px' },
           h('div', { class: 'bigkey', html: ICON.key }),
           h('h2', null, n < N ? 'הדלת נפתחה' : 'הדלת האחרונה נפתחה'),
           h('p', null, 'המפתח של חדר ' + n + ' אצלכם. עכשיו אפשר להבין מה בעצם עברתם.'));
         body.append(un);
-        const ex = h('section', { class: 'explain' },
-          h('h2', { class: 'explain-title' }, 'מה היה בחדר הזה'));
+        const ex = h('section', { class: 'explain' }, h('h2', { class: 'explain-title' }, 'מה היה בחדר הזה'));
         ex.insertAdjacentHTML('beforeend', room.explain);
         body.append(ex);
         const nav = h('div', { class: 'next' });
         if (n > 1) nav.append(h('button', { class: 'btn ghost', type: 'button', onclick: () => go('#/room/' + (n - 1)) }, '→ לחדר הקודם'));
         if (n < N) nav.append(h('button', { class: 'btn gold', type: 'button', onclick: () => go('#/room/' + (n + 1)) }, 'לחדר הבא'));
-        else nav.append(h('button', { class: 'btn gold', type: 'button', onclick: () => go('#/final') }, 'ליציאה ולסיכום'));
+        else nav.append(h('button', { class: 'btn gold', type: 'button', onclick: () => go('#/final') }, 'ליציאה מן הגוף'));
         body.append(nav);
         if (scrollToNext) un.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      } else {
-        if (!S.openAll) {
-          const holder = h('div');
-          const tgl = h('button', { class: 'btn ghost', type: 'button', 'aria-expanded': 'false' }, 'לקרוא קודם את ההסבר על האזור');
-          tgl.onclick = () => {
-            if (holder.firstChild) { holder.replaceChildren(); tgl.textContent = 'לקרוא קודם את ההסבר על האזור'; tgl.setAttribute('aria-expanded', 'false'); }
-            else {
-              const ex = h('section', { class: 'explain' }, h('h2', { class: 'explain-title' }, 'על האזור הזה'));
-              ex.insertAdjacentHTML('beforeend', room.explain);
-              holder.append(ex); tgl.textContent = 'הסתרת ההסבר וחזרה לחידות'; tgl.setAttribute('aria-expanded', 'true');
-            }
-          };
-          body.append(h('div', { class: 'row-actions', style: 'margin:0 0 14px' }, tgl), holder);
-        }
-        if (S.openAll) {
-          const ex = h('section', { class: 'explain' }, h('h2', { class: 'explain-title' }, 'מה היה בחדר הזה (מצב עיון)'));
-          ex.insertAdjacentHTML('beforeend', room.explain);
-          body.append(ex);
-          const nav = h('div', { class: 'next' });
-          if (n > 1) nav.append(h('button', { class: 'btn ghost', type: 'button', onclick: () => go('#/room/' + (n - 1)) }, '→ לחדר הקודם'));
-          nav.append(h('button', { class: 'btn gold', type: 'button', onclick: () => go(n < N ? '#/room/' + (n + 1) : '#/final') }, n < N ? 'לחדר הבא' : 'לסיכום'));
-          body.append(nav);
-        }
-        if (scrollToNext && activeEl) activeEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else if (scrollToNext && activeEl) {
+        activeEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
     }
     refreshRoom(false);
     return root;
   }
 
+  /* ---------- מסמך להדפסה / PDF ---------- */
+  function buildPrintDoc() {
+    const old = document.getElementById('print-doc');
+    if (old) old.remove();
+    const el = h('div', { id: 'print-doc' });
+    const clean = (html) => html
+      .replace(/ loading="lazy"/g, '')
+      .replace(/<details[^>]*>/g, '<div>').replace(/<\/details>/g, '</div>')
+      .replace(/<summary>/g, '<h3>').replace(/<\/summary>/g, '</h3>');
+    el.append(h('h1', null, 'מסע בתוך הנפרון'));
+    el.append(h('p', null, 'סיכום הלמידה: אנטומיה ופיזיולוגיה של הנפרון. מבוסס על ספר המגמה נפרולוגיה, ערך וארגן אורי העליון.'));
+    el.append(h('h2', { class: 'first' }, 'המסע בקצרה'));
+    el.insertAdjacentHTML('beforeend',
+      '<ol>' +
+      '<li><b>הפקעית:</b> סינון פסיבי לפי גודל ומטען; נוצר תסנין, ללא חלבונים ותאי דם.</li>' +
+      '<li><b>הצינורית המקורבת:</b> עיקר הספיגה החוזרת: כ-65% מן המים והנתרן, וכמעט כל הגלוקוז וחומצות האמינו.</li>' +
+      '<li><b>לולאת הנלה:</b> היורדת מאבדת מים והעולה מאבדת מלחים; נוצר מפל ריכוזים בליבה.</li>' +
+      '<li><b>המרוחקת והמאספת:</b> כוונון: ספיגת נתרן, הפרשת אשלגן ומימן (אלדוסטרון), וספיגת מים בהשפעת ADH.</li>' +
+      '<li><b>דרכי השתן:</b> הולכה ואגירה, בלי שינוי בהרכב.</li></ol>' +
+      '<p><b>מופרש בשתן = מסונן − נספג חזרה + מופרש לצינורית.</b></p>' +
+      fig('three-processes.jpg', 'שלושת התהליכים ונוסחת האיזון.') +
+      fig('journey.jpg', 'מסע התסנין: תהליך יצירת השתן בנפרון.'));
+    ROOMS.forEach((r) => {
+      el.append(h('h2', null, 'חדר ' + r.id + ': ' + r.title));
+      el.append(h('p', null, r.place));
+      const d = h('div', { class: 'explain' });
+      d.insertAdjacentHTML('beforeend', clean(r.explain));
+      el.append(d);
+    });
+    el.append(h('h2', null, 'מסלול החומרים'));
+    el.append(h('table', { class: 'tbl' },
+      h('thead', null, h('tr', null, h('th', null, 'חומר'), h('th', null, 'ספיגה חוזרת'), h('th', null, 'הפרשה'))),
+      h('tbody', null, SUBSTANCE_TABLE.map((r) => h('tr', null, h('th', null, r[0]), h('td', null, r[1]), h('td', null, r[2]))))));
+    el.append(h('h3', null, 'מילון מונחים'));
+    el.append(h('div', { class: 'terms', html: GLOSSARY.map((g) => term(g[0], g[1])).join('') }));
+    document.body.append(el);
+    return el;
+  }
+  function printPdf() {
+    const el = buildPrintDoc();
+    const imgs = [...el.querySelectorAll('img')];
+    const ready = Promise.all(imgs.map((im) => (im.complete ? Promise.resolve() : new Promise((r) => { im.onload = im.onerror = r; }))));
+    const title = document.title;
+    ready.then(() => {
+      document.title = 'מסע בתוך הנפרון - סיכום';
+      window.print();
+      setTimeout(() => { document.title = title; }, 500);
+    });
+  }
+
   function viewFinal() {
     const root = h('div');
-    root.append(h('section', { class: 'hero' }, h('div', { class: 'wrap' },
-      h('div', { class: 'kicker' }, 'יצאתם מן הנפרון'),
-      h('h1', null, 'סיכום ושאלות בחינה'),
-      h('p', { class: 'sub' }, 'כל חמשת המפתחות אצלכם.'))));
+    root.append(h('section', { class: 'hero short', style: '--bgy:1%' }, h('div', { class: 'wrap' },
+      h('div', { class: 'kicker' }, 'הצוללת עברה את כל הנפרון'),
+      h('h1', null, 'בהצלחה, יצאתם החוצה!'),
+      h('p', { class: 'sub' }, 'השתן נוצר, הדרך נפתחה, וכל חמשת המפתחות אצלכם.'))));
     const wrap = h('div', { class: 'wrap' });
 
-    wrap.append(h('h2', { class: 'explain-title', style: 'margin-top:30px' }, 'המסע בקצרה'));
-    wrap.append(h('p', { html: 'כ-180 ליטר תסנין ביממה נכנסים אל הצינוריות, וכ-1.5 ליטר שתן יוצאים. ההפרש חוזר לדם. כך נראה מסע הנוזל:' }));
+    wrap.append(h('div', { class: 'pdfcard' },
+      h('h2', null, 'הסיכום שלכם בקובץ PDF'),
+      h('p', null, 'כל ההסברים, האיורים והטבלאות של כל החדרים, בקובץ אחד ללימוד לפני המבחן. בחלון ההדפסה בחרו ״שמירה כ-PDF״.'),
+      h('button', { class: 'btn', type: 'button', onclick: printPdf }, 'הורדת סיכום PDF')));
+
+    wrap.append(h('h2', { class: 'explain-title' }, 'המסע בקצרה'));
+    wrap.append(h('p', { style: 'margin-top:12px', html: 'כ-180 ליטר תסנין ביממה נכנסים אל הצינוריות, וכ-1.5 ליטר שתן יוצאים. ההפרש חוזר לדם. כך נראה מסע הנוזל:' }));
     wrap.append(h('div', { class: 'explain' }, h('div', { html: fig('journey.jpg', 'מסע התסנין: תהליך יצירת השתן בנפרון.') })));
     wrap.append(h('ol', { html:
       '<li><b>הפקעית:</b> סינון פסיבי לפי גודל ומטען; נוצר תסנין, ללא חלבונים ותאי דם.</li>' +
@@ -712,45 +1033,39 @@
       '<li><b>לולאת הנלה:</b> היורדת מאבדת מים והעולה מאבדת מלחים; נוצר מפל ריכוזים בליבה.</li>' +
       '<li><b>המרוחקת והמאספת:</b> כוונון: ספיגת נתרן, הפרשת אשלגן ומימן (אלדוסטרון), וספיגת מים בהשפעת ADH.</li>' +
       '<li><b>דרכי השתן:</b> הולכה ואגירה, בלי שינוי בהרכב.</li>' }));
-
     wrap.append(h('div', { class: 'explain', html: fig('three-processes.jpg', 'שלושת התהליכים ונוסחת האיזון.') }));
-    wrap.append(h('div', { class: 'callout' , html:
+    wrap.append(h('div', { class: 'callout', html:
       '<p><b>ארבע שאלות לכל חומר</b> שאתם פוגשים בנפרון:</p><ol>' +
       '<li>איפה החומר נמצא עכשיו: בדם או בנוזל הצינורית?</li>' +
       '<li>לאיזה כיוון הוא נע?</li>' +
       '<li>באיזה תהליך: סינון, ספיגה חוזרת או הפרשה?</li>' +
       '<li>מה המשמעות להרכב ולנפח השתן ולשמירה על הומאוסטזיס?</li></ol>' }));
 
-    wrap.append(h('h3', { style: 'font-size:1.2rem;margin:26px 0 6px' }, 'מסלול החומרים'));
-    const tb = h('table', { class: 'tbl' },
+    wrap.append(h('h3', { style: 'font-size:1.3rem;margin:26px 0 6px' }, 'מסלול החומרים'));
+    wrap.append(h('div', { class: 'tbl-scroll' }, h('table', { class: 'tbl' },
       h('thead', null, h('tr', null, h('th', null, 'חומר'), h('th', null, 'ספיגה חוזרת'), h('th', null, 'הפרשה'))),
-      h('tbody', null, SUBSTANCE_TABLE.map((r) => h('tr', null, h('th', null, r[0]), h('td', null, r[1]), h('td', null, r[2])))));
-    wrap.append(h('div', { class: 'tbl-scroll' }, tb));
+      h('tbody', null, SUBSTANCE_TABLE.map((r) => h('tr', null, h('th', null, r[0]), h('td', null, r[1]), h('td', null, r[2])))))));
 
-    /* השוואה לניבוי הראשוני */
     if (PRE.some((q) => S.pre[q.id] != null)) {
-      wrap.append(h('h3', { style: 'font-size:1.2rem;margin:26px 0 6px' }, 'מה חשבתם בכניסה, ומה אתם יודעים עכשיו'));
+      wrap.append(h('h3', { style: 'font-size:1.3rem;margin:26px 0 6px' }, 'מה חשבתם בכניסה, ומה אתם יודעים עכשיו'));
       const cmp = h('div', { class: 'compare' });
       PRE.forEach((q) => {
         if (S.pre[q.id] == null) return;
-        const was = q.opts[S.pre[q.id]];
         const right = S.pre[q.id] === q.right;
         cmp.append(h('div', { class: 'cmp' },
           h('div', { class: 'q' }, q.q),
-          h('div', { class: 'a', html: '<b>בכניסה ענית:</b> ' + was + (right ? ' (נכון)' : ' (השתנה)') }),
+          h('div', { class: 'a', html: '<b>בכניסה ענית:</b> ' + q.opts[S.pre[q.id]] + (right ? ' (נכון)' : ' (השתנה)') }),
           h('div', { class: 'a', html: '<b>התשובה המדעית:</b> ' + q.sci })));
       });
       wrap.append(cmp);
     }
 
-    /* מבחן */
     wrap.append(h('h2', { class: 'explain-title', style: 'margin-top:40px' }, 'חמש שאלות בסגנון הבחינה'));
-    wrap.append(h('p', { style: 'color:var(--muted)' }, 'לכל שאלה תשובה נכונה אחת. אחרי כל תשובה תקבלו הסבר.'));
+    wrap.append(h('p', { style: 'color:var(--muted);margin-top:12px' }, 'לכל שאלה תשובה נכונה אחת. אחרי כל תשובה תקבלו הסבר.'));
     const scoreBox = h('div');
     function renderScore() {
       scoreBox.replaceChildren();
-      const answered = Object.keys(S.exam).length;
-      if (answered < EXAM.length) return;
+      if (Object.keys(S.exam).length < EXAM.length) return;
       const sc = EXAM.filter((q, i) => S.exam[i] === q.right).length;
       scoreBox.append(h('div', { class: 'card', style: 'text-align:center' },
         h('div', { class: 'score' }, sc + ' / ' + EXAM.length),
@@ -777,8 +1092,7 @@
           S.exam[qi] = i; save();
           [...list.children].forEach((x, k) => {
             x.disabled = true;
-            if (k === q.right) x.classList.add('ok');
-            else if (k === i) x.classList.add('no');
+            if (k === q.right) x.classList.add('ok'); else if (k === i) x.classList.add('no');
           });
           fbh.replaceChildren(fbBox(i === q.right ? 'ok' : 'no', i === q.right ? 'נכון. ' : 'לא נכון. ', q.exp));
           renderScore();
@@ -795,8 +1109,10 @@
     wrap.append(h('details', { class: 'more' },
       h('summary', null, 'מילון מונחים: עברית ואנגלית'),
       h('div', { class: 'in' }, h('div', { class: 'terms', html: GLOSSARY.map((g) => term(g[0], g[1])).join('') }),
-        h('p', { style: 'margin-top:12px;color:var(--muted);font-size:.92rem' }, 'בספר המגמה משתמשים לסירוגין ב״אבובית״ וב״צינורית״; שניהם אותו דבר.'))));
+        h('p', { style: 'margin-top:12px;color:var(--muted);font-size:.95rem' }, 'בספר המגמה משתמשים לסירוגין ב״אבובית״ וב״צינורית״; שניהם אותו דבר.'))));
 
+    wrap.append(h('div', { class: 'pdfcard' },
+      h('button', { class: 'btn', type: 'button', onclick: printPdf }, 'הורדת סיכום PDF')));
     wrap.append(h('div', { class: 'next' },
       h('button', { class: 'btn ghost', type: 'button', onclick: () => go('#/room/1') }, 'חזרה לחדר הראשון'),
       h('button', { class: 'btn ghost', type: 'button', onclick: () => {
@@ -809,10 +1125,10 @@
 
   /* ---------- רינדור ---------- */
   function render() {
-    closeMenu();
+    closeMenu(); closeSheet();
     const m = location.hash.match(/^#\/(intro|final|room\/(\d))$/);
     let view = m ? m[1] : null;
-    let n = m && m[2] ? +m[2] : null;
+    const n = m && m[2] ? +m[2] : null;
     if (!view) { location.replace(frontier()); return; }
     if (view.startsWith('room')) {
       if (!n || n < 1 || n > N || !canEnter(n)) { location.replace(frontier()); return; }
@@ -820,15 +1136,19 @@
     } else if (view === 'final' && !canFinal()) { location.replace(frontier()); return; }
 
     app.replaceChildren();
+    setBar(false, null, null);
     window.scrollTo(0, 0);
-    if (view === 'intro') { app.append(viewIntro()); updateChrome(null); document.title = 'מסע בתוך הנפרון'; }
-    else if (view === 'room') { app.append(viewRoom(n)); updateChrome(n); document.title = 'חדר ' + n + ' · ' + ROOMS[n - 1].title; }
-    else { app.append(viewFinal()); updateChrome(null); document.title = 'סיכום · מסע בתוך הנפרון'; }
+    if (view === 'intro') { app.append(viewIntro()); updateChrome(null, 'מסע בתוך הנפרון', ''); document.title = 'מסע בתוך הנפרון'; }
+    else if (view === 'room') {
+      app.append(viewRoom(n));
+      updateChrome(n, 'חדר ' + n + ' · ' + ROOMS[n - 1].title, ROOMS[n - 1].place);
+      document.title = 'חדר ' + n + ' · ' + ROOMS[n - 1].title;
+    } else { app.append(viewFinal()); updateChrome(null, 'יצאתם!', 'סיכום ושאלות בחינה'); document.title = 'סיכום · מסע בתוך הנפרון'; }
   }
 
   buildChrome();
   window.addEventListener('hashchange', render);
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeMenu(); closeSheet(); } });
   if (!location.hash) location.replace(frontier()); else render();
 })();
 
